@@ -8,7 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 
 
-class MediaInfo(BaseModel):
+class RedNoteMedia(BaseModel):
     """多媒体信息"""
     url: str = Field(..., description="多媒体链接")
     media_type: str = Field(..., description="媒体类型: image/video")
@@ -20,7 +20,7 @@ class MediaInfo(BaseModel):
         use_enum_values = True
 
 
-class InteractionData(BaseModel):
+class RedNoteInteraction(BaseModel):
     """互动数据"""
     like_count: int = Field(default=0, description="点赞数")
     comment_count: int = Field(default=0, description="评论数")
@@ -31,19 +31,14 @@ class InteractionData(BaseModel):
     @classmethod
     def parse_string_numbers(cls, v):
         """将字符串数字转换为整数"""
-        if isinstance(v, str):
-            try:
-                return int(v)
-            except ValueError:
-                return 0
-        return v
+        return int(v)
 
     class Config:
         """Pydantic配置"""
         use_enum_values = True
 
 
-class Note(BaseModel):
+class RedNote(BaseModel):
     """笔记核心数据模型"""
 
     # 基本信息
@@ -52,16 +47,15 @@ class Note(BaseModel):
     content: str = Field(default="", description="笔记正文内容")
 
     # 媒体信息
-    media_list: List[MediaInfo] = Field(default_factory=list, description="多媒体内容列表")
+    media_list: List[RedNoteMedia] = Field(default_factory=list, description="多媒体内容列表")
 
     # 互动数据
-    interaction: InteractionData = Field(default_factory=InteractionData, description="互动数据")
+    interaction: RedNoteInteraction = Field(default_factory=RedNoteInteraction, description="互动数据")
 
     # 元数据
     author_name: str = Field(default="", description="作者名称")
     author_id: str = Field(default="", description="作者ID")
     publish_time: Optional[str] = Field(None, description="发布时间")
-    note_url: str = Field(..., description="笔记URL")
 
     # 解析相关
     capture_time: datetime = Field(default_factory=datetime.now, description="捕获时间")
@@ -75,7 +69,7 @@ class Note(BaseModel):
         }
 
     @classmethod
-    def from_api_response(cls, api_item: dict) -> 'Note':
+    def from_api_response(cls, api_item: dict) -> 'RedNote':
         """从API响应创建笔记对象"""
         note_card = api_item.get('note_card', {})
 
@@ -89,7 +83,7 @@ class Note(BaseModel):
         # 封面图片
         cover = note_card.get('cover', {})
         if cover and cover.get('url_default'):
-            media_list.append(MediaInfo(
+            media_list.append(RedNoteMedia(
                 url=cover['url_default'],
                 media_type='image',
                 width=cover.get('height', 0),
@@ -102,7 +96,7 @@ class Note(BaseModel):
             info_list = img.get('info_list', [])
             for img_info in info_list:
                 if img_info.get('image_scene') == 'WB_DFT':  # 默认显示图片
-                    media_list.append(MediaInfo(
+                    media_list.append(RedNoteMedia(
                         url=img_info.get('url', ''),
                         media_type='image',
                         width=img.get('height', 0),
@@ -111,7 +105,7 @@ class Note(BaseModel):
 
         # 互动数据
         interact_info = note_card.get('interact_info', {})
-        interaction = InteractionData(
+        interaction = RedNoteInteraction(
             like_count=interact_info.get('liked_count', 0),
             comment_count=interact_info.get('comment_count', 0),
             collect_count=interact_info.get('collected_count', 0),
@@ -131,9 +125,6 @@ class Note(BaseModel):
                 publish_time = tag.get('text', '')
                 break
 
-        # URL
-        note_url = f"https://www.xiaohongshu.com/explore/{note_id}"
-
         return cls(
             note_id=note_id,
             title=title,
@@ -142,7 +133,6 @@ class Note(BaseModel):
             author_name=author_name,
             author_id=author_id,
             publish_time=publish_time,
-            note_url=note_url,
             source_type="api"
         )
 
