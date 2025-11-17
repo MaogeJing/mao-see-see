@@ -11,8 +11,8 @@ import sys
 import os
 
 # 添加数据结构路径
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'data_structures'))
-from xiaohongshu_models import XiaohongshuNote, XiaohongshuSearchResponse, save_notes_to_json
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'app'))
+from models.rednote import RedNote, create_rednotes_from_api_response
 
 def test_note_list_capture():
     """测试笔记列表抓取"""
@@ -103,7 +103,7 @@ def test_note_list_capture():
                                                 captured_notes.extend(notes)
                                                 print(f"✅ 提取到 {len(notes)} 个笔记")
                                                 for note in notes[:3]:  # 只显示前3个
-                                                    print(f"   📝 {note.get('title', '无标题')[:50]}...")
+                                                    print(f"   📝 {note.title[:50]}...")
                                     except Exception as e:
                                         print(f"⚠️ 处理响应失败: {str(e)}")
 
@@ -341,14 +341,22 @@ def extract_note_ids_from_url(url):
     return list(set(note_ids))  # 去重
 
 def save_captured_notes(notes):
-    """保存捕获的笔记信息 - 使用新的数据结构"""
+    """保存捕获的RedNote信息"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'scripts/note_list_capture_{timestamp}.json'
+    filename = f'scripts/rednote_capture_{timestamp}.json'
 
     try:
-        # 使用新的数据结构保存
-        save_notes_to_json(notes, filename)
-        print(f"💾 笔记数据已保存到: {filename}")
+        # 使用RedNote模型保存
+        data = {
+            'capture_time': datetime.now().isoformat(),
+            'total_notes': len(notes),
+            'notes': [note.dict() for note in notes]
+        }
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+
+        print(f"💾 RedNote数据已保存到: {filename}")
 
         # 生成统计报告
         generate_summary_report(notes, filename.replace('.json', '_summary.txt'))
@@ -357,40 +365,43 @@ def save_captured_notes(notes):
         print(f"❌ 保存失败: {str(e)}")
 
 def generate_summary_report(notes, filename):
-    """生成统计报告 - 使用新的数据结构"""
+    """生成统计报告 - 使用RedNote数据结构"""
     try:
         with open(filename, 'w', encoding='utf-8') as f:
-            f.write("小红书笔记列表抓取统计报告\n")
+            f.write("小红书RedNote列表抓取统计报告\n")
             f.write("=" * 40 + "\n\n")
             f.write(f"抓取时间: {datetime.now().isoformat()}\n")
-            f.write(f"笔记总数: {len(notes)}\n\n")
+            f.write(f"RedNote总数: {len(notes)}\n\n")
 
             # 统计信息
-            video_count = sum(1 for note in notes if note.is_video())
-            image_count = sum(1 for note in notes if note.has_images())
-            total_likes = sum(note.get_like_count() for note in notes)
-            total_comments = sum(note.get_comment_count() for note in notes)
-            total_collects = sum(note.get_collect_count() for note in notes)
+            video_count = sum(1 for note in notes if note.has_video())
+            image_count = sum(1 for note in notes if note.get_media_count() > 0)
+            total_likes = sum(note.interaction.like_count for note in notes)
+            total_comments = sum(note.interaction.comment_count for note in notes)
+            total_collects = sum(note.interaction.collect_count for note in notes)
 
             f.write("📊 统计信息:\n")
             f.write("-" * 20 + "\n")
             f.write(f"图文笔记: {len(notes) - video_count} 个\n")
             f.write(f"视频笔记: {video_count} 个\n")
-            f.write(f"包含图片: {image_count} 个\n")
+            f.write(f"包含媒体: {image_count} 个\n")
             f.write(f"总点赞数: {total_likes}\n")
             f.write(f"总评论数: {total_comments}\n")
             f.write(f"总收藏数: {total_collects}\n\n")
 
             # 显示前10个笔记
-            f.write("📝 前10个笔记详情:\n")
+            f.write("📝 前10个RedNote详情:\n")
             f.write("-" * 30 + "\n")
             for i, note in enumerate(notes[:10], 1):
                 f.write(f"{i}. {note.title}\n")
                 f.write(f"   ID: {note.note_id}\n")
-                f.write(f"   作者: {note.get_username()}\n")
-                f.write(f"   类型: {'视频' if note.is_video() else '图文'}\n")
-                f.write(f"   互动: 点赞{note.get_like_count()} 评论{note.get_comment_count()} 收藏{note.get_collect_count()}\n")
-                f.write(f"   URL: {note.note_url}\n\n")
+                f.write(f"   作者: {note.author_name}\n")
+                f.write(f"   类型: {'视频' if note.has_video() else '图文'}\n")
+                f.write(f"   媒体数: {note.get_media_count()}\n")
+                f.write(f"   互动: 点赞{note.interaction.like_count} 评论{note.interaction.comment_count} 收藏{note.interaction.collect_count}\n")
+                if note.get_primary_image_url():
+                    f.write(f"   主图: {note.get_primary_image_url()}\n")
+                f.write(f"   发布时间: {note.publish_time or '未知'}\n\n")
 
         print(f"📊 统计报告已保存到: {filename}")
 
@@ -398,7 +409,7 @@ def generate_summary_report(notes, filename):
         print(f"❌ 生成报告失败: {str(e)}")
 
 def process_search_api_response(response_body):
-    """处理搜索API响应数据 - 使用新的数据结构"""
+    """处理搜索API响应数据 - 使用RedNote模型"""
     try:
         print(f"🔍 处理API响应 ({len(response_body)} 字节)")
 
@@ -410,16 +421,18 @@ def process_search_api_response(response_body):
 
         print(f"📊 响应结构: {list(data.keys()) if isinstance(data, dict) else type(data)}")
 
-        # 使用新的数据结构解析
-        search_response = XiaohongshuSearchResponse.from_dict(data)
-        notes = search_response.notes
+        # 使用RedNote模型解析
+        notes = create_rednotes_from_api_response(data)
 
-        print(f"✅ 提取到 {len(notes)} 个笔记")
+        print(f"✅ 提取到 {len(notes)} 个RedNote")
 
         # 显示前几个笔记的摘要
         for i, note in enumerate(notes[:3]):
-            print(f"\n📝 笔记 {i+1} 摘要:")
-            print(note.format_summary())
+            print(f"\n📝 RedNote {i+1} 摘要:")
+            print(f"   标题: {note.title}")
+            print(f"   作者: {note.author_name}")
+            print(f"   媒体数: {note.get_media_count()}")
+            print(f"   互动: 🔥{note.interaction.like_count} 💬{note.interaction.comment_count}")
 
         return notes
 

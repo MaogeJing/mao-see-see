@@ -38,13 +38,12 @@ class RedNoteInteraction(BaseModel):
         use_enum_values = True
 
 
-class RedNote(BaseModel):
+class RedNotePreview(BaseModel):
     """笔记核心数据模型"""
 
     # 基本信息
     note_id: str = Field(..., description="笔记ID")
     title: str = Field(..., description="笔记标题")
-    content: str = Field(default="", description="笔记正文内容")
 
     # 媒体信息
     media_list: List[RedNoteMedia] = Field(default_factory=list, description="多媒体内容列表")
@@ -69,7 +68,7 @@ class RedNote(BaseModel):
         }
 
     @classmethod
-    def from_api_response(cls, api_item: dict) -> 'RedNote':
+    def from_api_response(cls, api_item: dict) -> 'RedNotePreview':
         """从API响应创建笔记对象"""
         note_card = api_item.get('note_card', {})
 
@@ -150,3 +149,29 @@ class RedNote(BaseModel):
     def get_media_count(self) -> int:
         """获取媒体数量"""
         return len(self.media_list)
+
+
+def create_rednote_previews_from_api_response(api_data: dict) -> list[RedNotePreview]:
+    """从API响应创建RedNotePreview列表"""
+    previews = []
+
+    # 解析标准API响应结构
+    data_section = api_data.get('data', {})
+    items = []
+
+    if isinstance(data_section, dict) and 'items' in data_section:
+        items = data_section['items']
+    elif isinstance(data_section, list):
+        items = data_section
+    elif 'items' in api_data:
+        items = api_data['items']
+
+    for item in items:
+        try:
+            preview = RedNotePreview.from_api_response(item)
+            previews.append(preview)
+        except Exception as e:
+            print(f"解析RedNotePreview失败: {str(e)}")
+            continue
+
+    return previews
