@@ -4,7 +4,7 @@
 """
 import time
 from enum import Enum
-from typing import Dict, Set, Any, Optional
+from typing import Dict, Set, Any
 from pydantic import BaseModel
 
 
@@ -104,133 +104,105 @@ class BusinessState(Enum):
 
 
 class EventType:
-    """业务事件类型 - 与业务状态对应"""
+    """与状态转换对应的业务事件类型"""
 
-    # 登录相关事件
-    LOGIN_CHECK_STARTED = "login_check_started"
-    LOGIN_REQUIRED = "login_required"
-    LOGIN_COMPLETED = "login_completed"
-    LOGIN_FAILED = "login_failed"
+    # 登录事件
+    LOGIN_REQUIRED = "login_required"      # 触发: CHECKING_LOGIN → LOGIN_WAIT
+    LOGIN_SUCCESS = "login_success"        # 触发: CHECKING_LOGIN/LONGIN_WAIT → LIST_STATE
 
-    # 搜索相关事件
-    SEARCH_STARTED = "search_started"
-    SEARCH_COMPLETED = "search_completed"
-    SEARCH_FAILED = "search_failed"
-    SEARCH_INPUT_RECEIVED = "search_input_received"
+    # 搜索事件
+    SEARCH = "search"                      # 触发: LIST_STATE → SEARCHING
+    SEARCH_RESULT = "search_result"        # 触发: SEARCHING → LIST_STATE
 
-    # 列表相关事件
-    NOTE_LIST_RECEIVED = "note_list_received"
-    NOTE_SELECTED = "note_selected"
-    NOTE_CLICKED = "note_clicked"
-    LIST_SCROLLED = "list_scrolled"
+    # 笔记选择事件
+    NOTE_SELECT = "note_select"            # 触发: LIST_STATE → SELECTING
+    NOTE_CLICKED = "note_clicked"          # 触发: SELECTING → DETAIL_STATE
+    CANCEL_SELECT = "cancel_select"        # 触发: SELECTING → LIST_STATE
 
-    # 详情相关事件
-    DETAIL_LOADED = "detail_loaded"
-    DETAIL_DATA_RECEIVED = "detail_data_received"
-    COMMENTS_RECEIVED = "comments_received"
-    BACK_TO_LIST = "back_to_list"
+    # 详情采集事件
+    DETAIL_LOADED = "detail_loaded"        # 详情页面加载完成
+    BACK_TO_LIST = "back_to_list"          # 触发: DETAIL_STATE → LIST_STATE
 
-    # 系统事件
-    SYSTEM_STARTED = "system_started"
-    SYSTEM_STOPPED = "system_stopped"
-    ERROR_OCCURRED = "error_occurred"
-    USER_INTERRUPT = "user_interrupt"
+    # 系统
+    LOGIN_EXPIRED = "login_expired"        # 触发: LIST_STATE/DETAIL_STATE → CHECKING_LOGIN
+    ERROR = "error"                        # 触发: 任意状态 → ERROR
+    STOP = "stop"                          # 触发: 任意状态 → STOP
 
 
 class Event(BaseModel):
-    """业务事件"""
+    """简化的业务事件"""
     type: str
     data: Dict[str, Any] = {}
-    source: Optional[str] = None
-    timestamp: float = 0.0
 
     def __init__(self, **data):
-        if 'timestamp' not in data or data['timestamp'] == 0.0:
-            data['timestamp'] = time.time()
+        if 'timestamp' not in data.get('data', {}):
+            data.setdefault('data', {})['timestamp'] = time.time()
         super().__init__(**data)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """获取数据"""
-        return self.data.get(key, default)
 
 
 # 事件工厂方法
 class EventFactory:
-    """事件工厂 - 创建标准业务事件"""
-
-    @staticmethod
-    def login_check_started():
-        """开始检查登录状态"""
-        return Event(type=EventType.LOGIN_CHECK_STARTED, source="login_handler")
+    """与状态转换对应的事件工厂"""
 
     @staticmethod
     def login_required():
-        """需要登录"""
-        return Event(type=EventType.LOGIN_REQUIRED, source="login_handler")
+        """需要登录 - 触发: CHECKING_LOGIN → LOGIN_WAIT"""
+        return Event(type=EventType.LOGIN_REQUIRED)
 
     @staticmethod
-    def login_completed():
-        """登录完成"""
-        return Event(type=EventType.LOGIN_COMPLETED, source="login_handler")
+    def login_success():
+        """登录成功 - 触发: CHECKING_LOGIN/LOGIN_WAIT → LIST_STATE"""
+        return Event(type=EventType.LOGIN_SUCCESS)
 
     @staticmethod
-    def search_started(keyword: str):
-        """开始搜索"""
-        return Event(
-            type=EventType.SEARCH_STARTED,
-            data={"keyword": keyword},
-            source="list_handler"
-        )
+    def search(keyword: str):
+        """开始搜索 - 触发: LIST_STATE → SEARCHING"""
+        return Event(type=EventType.SEARCH, data={"keyword": keyword})
 
     @staticmethod
-    def search_completed(notes: list):
-        """搜索完成"""
-        return Event(
-            type=EventType.SEARCH_COMPLETED,
-            data={"notes": notes, "count": len(notes)},
-            source="list_handler"
-        )
+    def search_result(notes: list):
+        """搜索结果 - 触发: SEARCHING → LIST_STATE"""
+        return Event(type=EventType.SEARCH_RESULT, data={"notes": notes})
 
     @staticmethod
-    def note_selected(note_id: str, note_data: dict):
-        """选择笔记"""
-        return Event(
-            type=EventType.NOTE_SELECTED,
-            data={"note_id": note_id, "note_data": note_data},
-            source="list_handler"
-        )
+    def note_select(note_id: str):
+        """选择笔记 - 触发: LIST_STATE → SELECTING"""
+        return Event(type=EventType.NOTE_SELECT, data={"note_id": note_id})
+
+    @staticmethod
+    def note_clicked(note_id: str):
+        """点击笔记 - 触发: SELECTING → DETAIL_STATE"""
+        return Event(type=EventType.NOTE_CLICKED, data={"note_id": note_id})
+
+    @staticmethod
+    def cancel_select():
+        """取消选择 - 触发: SELECTING → LIST_STATE"""
+        return Event(type=EventType.CANCEL_SELECT)
 
     @staticmethod
     def detail_loaded(note_id: str):
-        """详情页面加载完成"""
-        return Event(
-            type=EventType.DETAIL_LOADED,
-            data={"note_id": note_id},
-            source="detail_handler"
-        )
-
-    @staticmethod
-    def detail_data_received(detail_data: dict):
-        """详情数据接收完成"""
-        return Event(
-            type=EventType.DETAIL_DATA_RECEIVED,
-            data=detail_data,
-            source="detail_handler"
-        )
+        """详情加载完成"""
+        return Event(type=EventType.DETAIL_LOADED, data={"note_id": note_id})
 
     @staticmethod
     def back_to_list():
-        """返回列表"""
-        return Event(type=EventType.BACK_TO_LIST, source="detail_handler")
+        """返回列表 - 触发: DETAIL_STATE → LIST_STATE"""
+        return Event(type=EventType.BACK_TO_LIST)
 
     @staticmethod
-    def error(message: str, error_type: str = "general"):
-        """错误事件"""
-        return Event(
-            type=EventType.ERROR_OCCURRED,
-            data={"message": message, "error_type": error_type},
-            source="system"
-        )
+    def login_expired():
+        """登录过期 - 触发: LIST_STATE/DETAIL_STATE → CHECKING_LOGIN"""
+        return Event(type=EventType.LOGIN_EXPIRED)
+
+    @staticmethod
+    def error(message: str):
+        """错误事件 - 触发: 任意状态 → ERROR"""
+        return Event(type=EventType.ERROR, data={"message": message})
+
+    @staticmethod
+    def stop():
+        """停止事件 - 触发: 任意状态 → STOP"""
+        return Event(type=EventType.STOP)
 
 
 __all__ = [
