@@ -43,13 +43,15 @@ graph TB
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CHECKING_LOGIN
+    [*] --> START : 系统启动
+    START --> CHECKING_LOGIN : 初始化完成
     CHECKING_LOGIN --> LOGIN_WAIT : 需要登录
     CHECKING_LOGIN --> LIST_STATE : 已登录
     LOGIN_WAIT --> LIST_STATE : 登录完成
     LIST_STATE --> DETAIL_STATE : 点击笔记
     DETAIL_STATE --> LIST_STATE : 返回列表
 
+    note right of START : 🚀 系统启动<br/>初始化组件
     note right of LIST_STATE : 📋 列表状态<br/>搜索和浏览笔记
     note right of DETAIL_STATE : 📄 详情状态<br/>查看笔记内容
     note right of LOGIN_WAIT : 🔐 登录等待<br/>等待用户扫码

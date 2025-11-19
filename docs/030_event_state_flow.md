@@ -14,7 +14,8 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CHECKING_LOGIN : 系统启动
+    [*] --> START : 系统启动
+    START --> CHECKING_LOGIN : 🚀 SYSTEM_INITIALIZED
 
     %% 登录流程
     CHECKING_LOGIN --> LOGIN_WAIT : 🔐 LOGIN_REQUIRED
@@ -36,6 +37,7 @@ stateDiagram-v2
     DETAIL_STATE --> CHECKING_LOGIN : 🚨 LOGIN_EXPIRED
 
     %% 终止流程
+    START --> STOP : ⏹️ STOP
     CHECKING_LOGIN --> STOP : ⏹️ STOP
     LIST_STATE --> STOP : ⏹️ STOP
     SEARCHING --> STOP : ⏹️ STOP
@@ -44,6 +46,7 @@ stateDiagram-v2
     LOGIN_WAIT --> STOP : ⏹️ STOP
 
     %% 错误处理
+    START --> ERROR : ❌ ERROR
     CHECKING_LOGIN --> ERROR : ❌ ERROR
     LOGIN_WAIT --> ERROR : ❌ ERROR
     LIST_STATE --> ERROR : ❌ ERROR
@@ -54,6 +57,7 @@ stateDiagram-v2
     ERROR --> CHECKING_LOGIN : 🔧 恢复
     ERROR --> STOP : ⚠️ 终止
 
+    note right of START : 🚀 系统启动<br/>初始化组件
     note right of CHECKING_LOGIN : 🔍 检查登录状态<br/>验证用户身份
     note right of LOGIN_WAIT : 🔐 登录等待<br/>扫码登录流程
     note right of LIST_STATE : 📋 列表状态<br/>浏览搜索笔记
@@ -66,15 +70,21 @@ stateDiagram-v2
 
 ## 事件与状态转换详细映射
 
-### 1. 登录相关事件
+### 1. 系统初始化事件
 
 | 事件类型 | 源状态 | 目标状态 | 代码位置 | 触发条件 |
 |---------|--------|----------|----------|----------|
-| `LOGIN_REQUIRED` | `CHECKING_LOGIN` | `LOGIN_WAIT` | [`EventType.LOGIN_REQUIRED`](../core/state_types.py:110) | 检测到未登录 |
-| `LOGIN_SUCCESS` | `CHECKING_LOGIN` | `LIST_STATE` | [`EventType.LOGIN_SUCCESS`](../core/state_types.py:111) | 验证已登录 |
-| `LOGIN_SUCCESS` | `LOGIN_WAIT` | `LIST_STATE` | [`EventType.LOGIN_SUCCESS`](../core/state_types.py:111) | 扫码登录成功 |
+| `SYSTEM_INITIALIZED` | `START` | `CHECKING_LOGIN` | [`EventType.SYSTEM_INITIALIZED`](../core/state_types.py:110) | 系统初始化完成 |
 
-### 2. 核心业务事件
+### 2. 登录相关事件
+
+| 事件类型 | 源状态 | 目标状态 | 代码位置 | 触发条件 |
+|---------|--------|----------|----------|----------|
+| `LOGIN_REQUIRED` | `CHECKING_LOGIN` | `LOGIN_WAIT` | [`EventType.LOGIN_REQUIRED`](../core/state_types.py:113) | 检测到未登录 |
+| `LOGIN_SUCCESS` | `CHECKING_LOGIN` | `LIST_STATE` | [`EventType.LOGIN_SUCCESS`](../core/state_types.py:114) | 验证已登录 |
+| `LOGIN_SUCCESS` | `LOGIN_WAIT` | `LIST_STATE` | [`EventType.LOGIN_SUCCESS`](../core/state_types.py:114) | 扫码登录成功 |
+
+### 3. 核心业务事件
 
 | 事件类型 | 源状态 | 目标状态 | 代码位置 | 业务场景 |
 |---------|--------|----------|----------|----------|
@@ -85,7 +95,7 @@ stateDiagram-v2
 | `CANCEL_SELECT` | `SELECTING` | `LIST_STATE` | [`EventType.CANCEL_SELECT`](../core/state_types.py:120) | 用户取消选择 |
 | `BACK_TO_LIST` | `DETAIL_STATE` | `LIST_STATE` | [`EventType.BACK_TO_LIST`](../core/state_types.py:124) | 用户返回列表 |
 
-### 3. 系统事件
+### 4. 系统事件
 
 | 事件类型 | 源状态 | 目标状态 | 代码位置 | 处理逻辑 |
 |---------|--------|----------|----------|----------|
@@ -218,7 +228,7 @@ flowchart TD
 - 避免隐式状态转换
 - 状态转换要原子性
 
-### 3. 事件数据设计
+### 5. 事件数据设计
 
 - 事件数据包含处理所需的最小信息
 - 避免在事件中传递大量数据

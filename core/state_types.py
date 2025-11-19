@@ -106,6 +106,9 @@ class BusinessState(Enum):
 class EventType:
     """与状态转换对应的业务事件类型"""
 
+    # 系统初始化事件
+    SYSTEM_INITIALIZED = "system_initialized"  # 触发: START → CHECKING_LOGIN
+
     # 登录事件
     LOGIN_REQUIRED = "login_required"      # 触发: CHECKING_LOGIN → LOGIN_WAIT
     LOGIN_SUCCESS = "login_success"        # 触发: CHECKING_LOGIN/LONGIN_WAIT → LIST_STATE
@@ -143,6 +146,11 @@ class Event(BaseModel):
 # 事件工厂方法
 class EventFactory:
     """与状态转换对应的事件工厂"""
+
+    @staticmethod
+    def system_initialized():
+        """系统初始化完成 - 触发: START → CHECKING_LOGIN"""
+        return Event(type=EventType.SYSTEM_INITIALIZED)
 
     @staticmethod
     def login_required():

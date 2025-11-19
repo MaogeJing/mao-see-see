@@ -62,7 +62,9 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> CHECKING_LOGIN
+    [*] --> START : 系统启动
+    START --> CHECKING_LOGIN : 初始化完成
+
     CHECKING_LOGIN --> LOGIN_WAIT : 需要登录
     CHECKING_LOGIN --> LIST_STATE : 已登录
 
@@ -77,6 +79,7 @@ stateDiagram-v2
     DETAIL_STATE --> LIST_STATE : 返回列表
     DETAIL_STATE --> [*] : 系统停止
 
+    note right of START : 🚀 系统启动<br/>初始化组件
     note right of CHECKING_LOGIN : 🔍 检查登录状态<br/>验证用户身份
     note right of LOGIN_WAIT : 🔐 登录等待<br/>扫码登录流程
     note right of LIST_STATE : 📋 列表状态<br/>浏览搜索笔记
@@ -87,8 +90,14 @@ stateDiagram-v2
 
 #### 状态详细说明
 
+**🚀 START（系统启动状态）**
+- **业务含义**: 系统启动时的初始状态，负责初始化所有组件
+- **用户操作**: 无感知操作
+- **技术动作**: 启动浏览器、加载配置、初始化数据库、检查环境
+- **数据产出**: 系统初始化完成确认事件
+
 **🔍 CHECKING_LOGIN（检查登录状态）**
-- **业务含义**: 系统启动时检查用户是否已登录小红书
+- **业务含义**: 系统初始化完成后，检查用户是否已登录小红书
 - **用户操作**: 无感知操作
 - **技术动作**: 检查页面状态、cookie、登录令牌
 - **数据产出**: 登录状态判断结果
@@ -201,6 +210,7 @@ STATE_API_MAPPING = {
 
 ```python
 STATE_TRANSITIONS = {
+    'START': ['CHECKING_LOGIN'],                                 # 系统初始化完成
     'CHECKING_LOGIN': ['LOGIN_WAIT', 'LIST_STATE'],              # 检查登录状态
     'LOGIN_WAIT': ['LIST_STATE'],                                 # 登录完成后进入列表
     'LIST_STATE': ['SEARCHING', 'SELECTING', 'CHECKING_LOGIN'],  # 列表页可搜索、选择、检查登录
@@ -214,6 +224,7 @@ STATE_TRANSITIONS = {
 
 | 当前状态 | 目标状态 | 触发事件 | 成功条件 | 失败处理 |
 |---------|---------|----------|----------|----------|
+| START | CHECKING_LOGIN | 系统初始化完成 | 所有组件就绪 | 重新初始化 |
 | CHECKING_LOGIN | LOGIN_WAIT | 检测到未登录 | 发现登录页面 | 重新检查 |
 | CHECKING_LOGIN | LIST_STATE | 检测到已登录 | 验证登录状态 | 进入登录等待 |
 | LOGIN_WAIT | LIST_STATE | 用户扫码完成 | 检测到登录成功 | 继续等待 |
