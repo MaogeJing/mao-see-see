@@ -40,7 +40,6 @@ class EventBus:
             return
 
         # 并发执行所有处理器
-        import asyncio
         tasks = []
         for handler in all_handlers:
             task = asyncio.create_task(self._safe_call(handler, event))
