@@ -2,6 +2,7 @@
 事件总线 - 纯订阅管理器
 负责事件订阅和分发，不处理队列
 """
+import asyncio
 from typing import Dict, List, Callable, Optional
 from .state_types import Event
 
